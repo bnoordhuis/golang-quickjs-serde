@@ -53,14 +53,14 @@ type UndefinedValue struct{}
 
 var Undefined = UndefinedValue{}
 
-func ReadObject(r io.Reader) (v any, err error) {
+func ReadValue(r io.Reader) (v any, err error) {
 	defer func() {
 		if x := recover(); x != nil {
 			switch v := x.(type) {
 			case error:
 				err = v
 			default:
-				err = fmt.Errorf("serde.ReadObject: %v", v)
+				err = fmt.Errorf("serde.ReadValue: %v", v)
 			}
 		}
 	}()
@@ -73,15 +73,15 @@ func ReadObject(r io.Reader) (v any, err error) {
 	for i := 0; i < atomCount; i++ {
 		atoms[i] = readString(br)
 	}
-	v = readObject(br, atoms)
+	v = readValue(br, atoms)
 	return
 }
 
-func WriteObject(w io.Writer, v any) error {
+func WriteValue(w io.Writer, v any) error {
 	return nil
 }
 
-func readObject(r *bufio.Reader, atoms []string) any {
+func readValue(r *bufio.Reader, atoms []string) any {
 	switch tag := readByte(r); tag {
 	case tagNull:
 		return nil
@@ -121,14 +121,14 @@ func readObject(r *bufio.Reader, atoms []string) any {
 			} else {
 				panic("atom out of range")
 			}
-			m[atom] = readObject(r, atoms)
+			m[atom] = readValue(r, atoms)
 		}
 		return m
 	case tagArray:
 		n := readUint32(r)
 		v := make([]any, n)
 		for i := uint32(0); i < n; i++ {
-			v[i] = readObject(r, atoms)
+			v[i] = readValue(r, atoms)
 		}
 		return v
 	case tagArrayBuffer:

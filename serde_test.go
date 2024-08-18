@@ -20,66 +20,66 @@ import (
 	"testing"
 )
 
-func TestReadObject(t *testing.T) {
-	if nil != tryReadObject([]byte{bcVersion, 0, 1}) {
+func TestReadValue(t *testing.T) {
+	if nil != tryReadValue([]byte{bcVersion, 0, 1}) {
 		panic("nil expected")
 	}
-	if Undefined != tryReadObject([]byte{bcVersion, 0, 2}) {
+	if Undefined != tryReadValue([]byte{bcVersion, 0, 2}) {
 		panic("undefined expected")
 	}
-	if false != tryReadObject([]byte{bcVersion, 0, 3}) {
+	if false != tryReadValue([]byte{bcVersion, 0, 3}) {
 		panic("false expected")
 	}
-	if true != tryReadObject([]byte{bcVersion, 0, 4}) {
+	if true != tryReadValue([]byte{bcVersion, 0, 4}) {
 		panic("true expected")
 	}
-	if int32(42) != tryReadObject([]byte{bcVersion, 0, 5, 84}) {
+	if int32(42) != tryReadValue([]byte{bcVersion, 0, 5, 84}) {
 		panic("42 expected")
 	}
-	if float64(13.37) != tryReadObject([]byte{bcVersion, 0, 6, 61, 10, 215, 163, 112, 189, 42, 64}) {
+	if float64(13.37) != tryReadValue([]byte{bcVersion, 0, 6, 61, 10, 215, 163, 112, 189, 42, 64}) {
 		panic("13.37 expected")
 	}
 	// note: quickjs never produces 0.0 but writes a zero int32 instead
-	if float64(0.0) != tryReadObject([]byte{bcVersion, 0, 6, 0, 0, 0, 0, 0, 0, 0, 0}) {
+	if float64(0.0) != tryReadValue([]byte{bcVersion, 0, 6, 0, 0, 0, 0, 0, 0, 0, 0}) {
 		panic("0.0 expected")
 	}
-	if float64(-0.0) != tryReadObject([]byte{bcVersion, 0, 6, 0, 0, 0, 0, 0, 0, 0, 128}) {
+	if float64(-0.0) != tryReadValue([]byte{bcVersion, 0, 6, 0, 0, 0, 0, 0, 0, 0, 128}) {
 		panic("-0.0 expected")
 	}
-	if "ok" != tryReadObject([]byte{bcVersion, 0, 7, 4, 111, 107}) {
+	if "ok" != tryReadValue([]byte{bcVersion, 0, 7, 4, 111, 107}) {
 		panic("\"ok\" expected")
 	}
-	if "😭" != tryReadObject([]byte{bcVersion, 0, 7, 5, 61, 216, 45, 222}) {
+	if "😭" != tryReadValue([]byte{bcVersion, 0, 7, 5, 61, 216, 45, 222}) {
 		panic("\"😭\" expected")
 	}
-	if !reflect.DeepEqual([]any{}, tryReadObject([]byte{bcVersion, 0, 9, 0})) {
+	if !reflect.DeepEqual([]any{}, tryReadValue([]byte{bcVersion, 0, 9, 0})) {
 		panic("[null] expected")
 	}
-	if !reflect.DeepEqual([]any{nil}, tryReadObject([]byte{bcVersion, 0, 9, 1, 1})) {
+	if !reflect.DeepEqual([]any{nil}, tryReadValue([]byte{bcVersion, 0, 9, 1, 1})) {
 		panic("[null] expected")
 	}
-	if !reflect.DeepEqual([]byte{}, tryReadObject([]byte{bcVersion, 0, 15, 0})) {
+	if !reflect.DeepEqual([]byte{}, tryReadValue([]byte{bcVersion, 0, 15, 0})) {
 		panic("ArrayBuffer() expected")
 	}
-	if !reflect.DeepEqual([]byte{42}, tryReadObject([]byte{bcVersion, 0, 15, 1, 42})) {
+	if !reflect.DeepEqual([]byte{42}, tryReadValue([]byte{bcVersion, 0, 15, 1, 42})) {
 		panic("ArrayBuffer() expected")
 	}
-	if !reflect.DeepEqual([]byte{42}, tryReadObject([]byte{bcVersion, 0, 14, 2, 1, 0, 15, 1, 42})) {
+	if !reflect.DeepEqual([]byte{42}, tryReadValue([]byte{bcVersion, 0, 14, 2, 1, 0, 15, 1, 42})) {
 		panic("Uint8Array([42]) expected")
 	}
-	if !reflect.DeepEqual(map[string]any{"k": nil}, tryReadObject([]byte{bcVersion, 1, 2, 107, 8, 1, 2, 1})) {
+	if !reflect.DeepEqual(map[string]any{"k": nil}, tryReadValue([]byte{bcVersion, 1, 2, 107, 8, 1, 2, 1})) {
 		panic("{k:null} expected")
 	}
-	if !reflect.DeepEqual(map[string]any{"42": nil}, tryReadObject([]byte{bcVersion, 0, 8, 1, 85, 1})) {
+	if !reflect.DeepEqual(map[string]any{"42": nil}, tryReadValue([]byte{bcVersion, 0, 8, 1, 85, 1})) {
 		panic("{[42]:null} expected")
 	}
-	if !reflect.DeepEqual(map[string]any{"-42": nil}, tryReadObject([]byte{bcVersion, 1, 6, 45, 52, 50, 8, 1, 2, 1})) {
+	if !reflect.DeepEqual(map[string]any{"-42": nil}, tryReadValue([]byte{bcVersion, 1, 6, 45, 52, 50, 8, 1, 2, 1})) {
 		panic("{[-42]:null} expected")
 	}
 }
 
-func tryReadObject(b []byte) any {
-	v, err := ReadObject(bytes.NewReader(b))
+func tryReadValue(b []byte) any {
+	v, err := ReadValue(bytes.NewReader(b))
 	if err != nil {
 		panic(err)
 	}
