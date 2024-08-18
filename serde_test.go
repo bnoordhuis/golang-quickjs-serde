@@ -78,9 +78,27 @@ func TestReadValue(t *testing.T) {
 	}
 }
 
+func TestReadObject(t *testing.T) {
+	type empty struct{}
+	if !reflect.DeepEqual(&empty{}, tryReadObject(&empty{}, []byte{bcVersion, 0, 8, 0})) {
+		panic("empty struct expected")
+	}
+	if !reflect.DeepEqual(&empty{}, tryReadObject(&empty{}, []byte{bcVersion, 1, 2, 107, 8, 1, 2, 1})) {
+		panic("empty struct expected")
+	}
+}
+
 func tryReadValue(b []byte) any {
 	v, err := ReadValue(bytes.NewReader(b))
 	if err != nil {
+		panic(err)
+	}
+	return v
+}
+
+func tryReadObject(v any, b []byte) any {
+	br := bytes.NewReader(b)
+	if err := ReadObject(br, v); err != nil {
 		panic(err)
 	}
 	return v

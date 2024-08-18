@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"reflect"
 	"unicode/utf16"
 )
 
@@ -73,6 +74,53 @@ func ReadValue(r io.Reader) (v any, err error) {
 	}
 	v = readValue(r, atoms)
 	return
+}
+
+func ReadObject(r io.Reader, v any) (err error) {
+	typ := reflect.TypeOf(v).Elem()
+	defer func() {
+		if x := recover(); x != nil {
+			switch v := x.(type) {
+			case error:
+				err = v
+			default:
+				err = fmt.Errorf("serde.ReadObject: %v", v)
+			}
+		}
+	}()
+	if version := readByte(r); version != bcVersion {
+		panic(fmt.Sprintf("version mismatch (have %d, want %d)", version, bcVersion))
+	}
+	atomCount := readUint32(r)
+	atoms := make([]string, atomCount)
+	for i := 0; i < atomCount; i++ {
+		atoms[i] = readString(r)
+	}
+	if tag := readByte(r); tag != tagObject {
+		panic(fmt.Sprintf("object expected, have %s", tagName(tag)))
+	}
+	propCount := readUint32(r)
+	for i := 0; i < propCount; i++ {
+		k := readUint32(r)
+		isTaggedInt := (k & 1) == 1
+		k = k >> 1
+		var atom string
+		if isTaggedInt {
+			atom = fmt.Sprintf("%d", k)
+		} else if k > 0 && k <= len(atoms) {
+			atom = atoms[k-1]
+		} else {
+			panic("atom out of range")
+		}
+		field, ok := typ.FieldByName(atom)
+		if ok {
+			_ = field
+			_ = readValue(r, atoms) // TODO
+		} else {
+			_ = readValue(r, atoms) // just skip the value
+		}
+	}
+	return nil
 }
 
 func WriteValue(w io.Writer, v any) error {
@@ -196,12 +244,8 @@ func readValue(r io.Reader, atoms []string) any {
 		default:
 			panic("unreachable")
 		}
-	case tagFunctionBytecode:
-		panic("bytecode not supported")
-	case tagModule:
-		panic("module not supported")
 	default:
-		panic(fmt.Sprintf("unknown tag %02x", tag))
+		panic(fmt.Sprintf("unsupported %s", tagName(tag)))
 	}
 }
 
@@ -262,4 +306,50 @@ func panicIf(err error) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func tagName(tag byte) string {
+	switch tag {
+	case tagNull:
+		return "null"
+	case tagUndefined:
+		return "undefined"
+	case tagFalse:
+		return "false"
+	case tagTrue:
+		return "true"
+	case tagInt32:
+		return "int32"
+	case tagFloat64:
+		return "float64"
+	case tagString:
+		return "string"
+	case tagObject:
+		return "object"
+	case tagArray:
+		return "array"
+	case tagBigInt:
+		return "bigint"
+	case tagTemplateObject:
+		return "template object"
+	case tagFunctionBytecode:
+		return "function bytecode"
+	case tagModule:
+		return "module"
+	case tagTypedArray:
+		return "typed array" // TODO include type
+	case tagArrayBuffer:
+		return "arraybuffer"
+	case tagSharedArrayBuffer:
+		return "sharedarraybuffer"
+	case tagRegExp:
+		return "regexp"
+	case tagDate:
+		return "date"
+	case tagObjectValue:
+		return "object value"
+	case tagObjectReference:
+		return "object reference"
+	}
+	return fmt.Sprintf("unknown tag %d", tag)
 }
