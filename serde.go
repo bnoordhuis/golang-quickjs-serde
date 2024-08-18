@@ -68,7 +68,7 @@ func ReadValue(r io.Reader) (v any, err error) {
 	if version := readByte(br); version != bcVersion {
 		panic(fmt.Sprintf("version mismatch (have %d, want %d)", version, bcVersion))
 	}
-	atomCount := int(readUint32(br))
+	atomCount := readUint32(br)
 	atoms := make([]string, atomCount)
 	for i := 0; i < atomCount; i++ {
 		atoms[i] = readString(br)
@@ -107,10 +107,10 @@ func readValue(r *bufio.Reader, atoms []string) any {
 	case tagString:
 		return readString(r)
 	case tagObject:
-		n := int(readUint32(r))
+		n := readUint32(r)
 		m := make(map[string]any, n)
 		for i := 0; i < n; i++ {
-			k := int(readUint32(r))
+			k := readUint32(r)
 			isTaggedInt := (k & 1) == 1
 			k = k >> 1
 			var atom string
@@ -127,7 +127,7 @@ func readValue(r *bufio.Reader, atoms []string) any {
 	case tagArray:
 		n := readUint32(r)
 		v := make([]any, n)
-		for i := uint32(0); i < n; i++ {
+		for i := 0; i < n; i++ {
 			v[i] = readValue(r, atoms)
 		}
 		return v
@@ -215,7 +215,7 @@ func readByte(r *bufio.Reader) byte {
 	}
 }
 
-func readBytes(r *bufio.Reader, n uint32) []byte {
+func readBytes(r *bufio.Reader, n int) []byte {
 	b := make([]byte, n)
 	if _, err := r.Read(b); err != nil {
 		panic(err)
@@ -223,15 +223,15 @@ func readBytes(r *bufio.Reader, n uint32) []byte {
 	return b
 }
 
-func readUint32(r *bufio.Reader) uint32 {
+func readUint32(r *bufio.Reader) int {
 	v, err := binary.ReadUvarint(r)
 	if err != nil {
 		panic(err)
 	}
-	if v > math.MaxUint32 {
+	if v > math.MaxUint32 || v > math.MaxInt {
 		panic(fmt.Sprintf("uint32 out of range: %d", v))
 	}
-	return uint32(v)
+	return int(v)
 }
 
 func readString(r *bufio.Reader) string {
