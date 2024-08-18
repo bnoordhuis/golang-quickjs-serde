@@ -15,7 +15,6 @@
 package serde
 
 import (
-	"bufio"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -64,16 +63,15 @@ func ReadValue(r io.Reader) (v any, err error) {
 			}
 		}
 	}()
-	br := bufio.NewReader(r)
-	if version := readByte(br); version != bcVersion {
+	if version := readByte(r); version != bcVersion {
 		panic(fmt.Sprintf("version mismatch (have %d, want %d)", version, bcVersion))
 	}
-	atomCount := readUint32(br)
+	atomCount := readUint32(r)
 	atoms := make([]string, atomCount)
 	for i := 0; i < atomCount; i++ {
-		atoms[i] = readString(br)
+		atoms[i] = readString(r)
 	}
-	v = readValue(br, atoms)
+	v = readValue(r, atoms)
 	return
 }
 
@@ -81,7 +79,7 @@ func WriteValue(w io.Writer, v any) error {
 	return nil
 }
 
-func readValue(r *bufio.Reader, atoms []string) any {
+func readValue(r io.Reader, atoms []string) any {
 	switch tag := readByte(r); tag {
 	case tagNull:
 		return nil
@@ -92,7 +90,7 @@ func readValue(r *bufio.Reader, atoms []string) any {
 	case tagTrue:
 		return true
 	case tagInt32:
-		v, err := binary.ReadVarint(r)
+		v, err := binary.ReadVarint(byteReader{r})
 		if err != nil {
 			panic(err)
 		}
@@ -207,24 +205,36 @@ func readValue(r *bufio.Reader, atoms []string) any {
 	}
 }
 
-func readByte(r *bufio.Reader) byte {
-	if b, err := r.ReadByte(); err == nil {
+type byteReader struct {
+	r io.Reader
+}
+
+func (br byteReader) ReadByte() (res byte, err error) {
+	var b [1]byte
+	_, err = br.r.Read(b[:])
+	res = b[0]
+	return
+}
+
+func readByte(r io.Reader) byte {
+	br := byteReader{r}
+	if b, err := br.ReadByte(); err == nil {
 		return b
 	} else {
 		panic(err)
 	}
 }
 
-func readBytes(r *bufio.Reader, n int) []byte {
+func readBytes(r io.Reader, n int) []byte {
 	b := make([]byte, n)
-	if _, err := r.Read(b); err != nil {
+	if _, err := r.Read(b); err != nil && n > 0 {
 		panic(err)
 	}
 	return b
 }
 
-func readUint32(r *bufio.Reader) int {
-	v, err := binary.ReadUvarint(r)
+func readUint32(r io.Reader) int {
+	v, err := binary.ReadUvarint(byteReader{r})
 	if err != nil {
 		panic(err)
 	}
@@ -234,7 +244,7 @@ func readUint32(r *bufio.Reader) int {
 	return int(v)
 }
 
-func readString(r *bufio.Reader) string {
+func readString(r io.Reader) string {
 	n := readUint32(r)
 	isWide := (n & 1) == 1
 	n = n >> 1
