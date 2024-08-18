@@ -68,9 +68,12 @@ func ReadObject(r io.Reader) (v any, err error) {
 	if version := readByte(br); version != bcVersion {
 		panic(fmt.Sprintf("version mismatch (have %d, want %d)", version, bcVersion))
 	}
-	atomCount := readUint32(br)
-	_ = atomCount
-	v = readObject(br)
+	atomCount := int(readUint32(br))
+	atoms := make([]string, atomCount)
+	for i := 0; i < atomCount; i++ {
+		atoms[i] = readString(br)
+	}
+	v = readObject(br, atoms)
 	return
 }
 
@@ -78,7 +81,7 @@ func WriteObject(w io.Writer, v any) error {
 	return nil
 }
 
-func readObject(r *bufio.Reader) any {
+func readObject(r *bufio.Reader, atoms []string) any {
 	switch tag := readByte(r); tag {
 	case tagNull:
 		return nil
@@ -102,22 +105,30 @@ func readObject(r *bufio.Reader) any {
 		panicIf(binary.Read(r, binary.LittleEndian, &v))
 		return v
 	case tagString:
-		n := readUint32(r)
-		isWide := (n & 1) == 1
-		n = n >> 1
-		if isWide {
-			h := make([]uint16, n)
-			panicIf(binary.Read(r, binary.LittleEndian, &h))
-			return string(utf16.Decode(h))
-		} else {
-			b := readBytes(r, n)
-			return string(b)
+		return readString(r)
+	case tagObject:
+		n := int(readUint32(r))
+		m := make(map[string]any, n)
+		for i := 0; i < n; i++ {
+			k := int(readUint32(r))
+			isTaggedInt := (k & 1) == 1
+			k = k >> 1
+			var atom string
+			if isTaggedInt {
+				atom = fmt.Sprintf("%d", k)
+			} else if k > 0 && k <= len(atoms) {
+				atom = atoms[k-1]
+			} else {
+				panic("atom out of range")
+			}
+			m[atom] = readObject(r, atoms)
 		}
+		return m
 	case tagArray:
 		n := readUint32(r)
 		v := make([]any, n)
 		for i := uint32(0); i < n; i++ {
-			v[i] = readObject(r)
+			v[i] = readObject(r, atoms)
 		}
 		return v
 	case tagArrayBuffer:
@@ -221,6 +232,20 @@ func readUint32(r *bufio.Reader) uint32 {
 		panic(fmt.Sprintf("uint32 out of range: %d", v))
 	}
 	return uint32(v)
+}
+
+func readString(r *bufio.Reader) string {
+	n := readUint32(r)
+	isWide := (n & 1) == 1
+	n = n >> 1
+	if isWide {
+		h := make([]uint16, n)
+		panicIf(binary.Read(r, binary.LittleEndian, &h))
+		return string(utf16.Decode(h))
+	} else {
+		b := readBytes(r, n)
+		return string(b)
+	}
 }
 
 func panicIf(err error) {

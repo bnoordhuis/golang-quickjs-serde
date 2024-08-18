@@ -67,6 +67,15 @@ func TestReadObject(t *testing.T) {
 	if !reflect.DeepEqual([]byte{42}, tryReadObject([]byte{bcVersion, 0, 14, 2, 1, 0, 15, 1, 42})) {
 		panic("Uint8Array([42]) expected")
 	}
+	if !reflect.DeepEqual(map[string]any{"k": nil}, tryReadObject([]byte{bcVersion, 1, 2, 107, 8, 1, 2, 1})) {
+		panic("{k:null} expected")
+	}
+	if !reflect.DeepEqual(map[string]any{"42": nil}, tryReadObject([]byte{bcVersion, 0, 8, 1, 85, 1})) {
+		panic("{[42]:null} expected")
+	}
+	if !reflect.DeepEqual(map[string]any{"-42": nil}, tryReadObject([]byte{bcVersion, 1, 6, 45, 52, 50, 8, 1, 2, 1})) {
+		panic("{[-42]:null} expected")
+	}
 }
 
 func tryReadObject(b []byte) any {
