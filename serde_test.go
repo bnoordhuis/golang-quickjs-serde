@@ -49,6 +49,9 @@ func TestReadObject(t *testing.T) {
 	if "ok" != tryReadObject([]byte{bcVersion, 0, 7, 4, 111, 107}) {
 		panic("\"ok\" expected")
 	}
+	if "😭" != tryReadObject([]byte{bcVersion, 0, 7, 5, 61, 216, 45, 222}) {
+		panic("\"😭\" expected")
+	}
 	if !reflect.DeepEqual([]any{}, tryReadObject([]byte{bcVersion, 0, 9, 0})) {
 		panic("[null] expected")
 	}

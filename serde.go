@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"unicode/utf16"
 )
 
 const bcVersion = 12
@@ -105,10 +106,13 @@ func readObject(r *bufio.Reader) any {
 		isWide := (n & 1) == 1
 		n = n >> 1
 		if isWide {
-			panic("TODO support wide character strings")
+			h := make([]uint16, n)
+			panicIf(binary.Read(r, binary.LittleEndian, &h))
+			return string(utf16.Decode(h))
+		} else {
+			b := readBytes(r, n)
+			return string(b)
 		}
-		b := readBytes(r, n)
-		return string(b)
 	case tagArray:
 		n := readUint32(r)
 		v := make([]any, n)
