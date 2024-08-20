@@ -64,14 +64,7 @@ func ReadValue(r io.Reader) (v any, err error) {
 			}
 		}
 	}()
-	if version := readByte(r); version != bcVersion {
-		panic(fmt.Sprintf("version mismatch (have %d, want %d)", version, bcVersion))
-	}
-	atomCount := readUint32(r)
-	atoms := make([]string, atomCount)
-	for i := 0; i < atomCount; i++ {
-		atoms[i] = readString(r)
-	}
+	atoms := readHeader(r)
 	v = readValue(r, atoms)
 	return
 }
@@ -88,30 +81,13 @@ func ReadObject(r io.Reader, v any) (err error) {
 			}
 		}
 	}()
-	if version := readByte(r); version != bcVersion {
-		panic(fmt.Sprintf("version mismatch (have %d, want %d)", version, bcVersion))
-	}
-	atomCount := readUint32(r)
-	atoms := make([]string, atomCount)
-	for i := 0; i < atomCount; i++ {
-		atoms[i] = readString(r)
-	}
+	atoms := readHeader(r)
 	if tag := readByte(r); tag != tagObject {
 		panic(fmt.Sprintf("object expected, have %s", tagName(tag)))
 	}
-	propCount := readUint32(r)
-	for i := 0; i < propCount; i++ {
-		k := readUint32(r)
-		isTaggedInt := (k & 1) == 1
-		k = k >> 1
-		var atom string
-		if isTaggedInt {
-			atom = fmt.Sprintf("%d", k)
-		} else if k > 0 && k <= len(atoms) {
-			atom = atoms[k-1]
-		} else {
-			panic("atom out of range")
-		}
+	count := readUint32(r) // property count
+	for i := 0; i < count; i++ {
+		atom := readAtom(r, atoms)
 		field, ok := typ.FieldByName(atom)
 		if ok {
 			_ = field
@@ -125,6 +101,31 @@ func ReadObject(r io.Reader, v any) (err error) {
 
 func WriteValue(w io.Writer, v any) error {
 	return nil
+}
+
+func readHeader(r io.Reader) []string {
+	if version := readByte(r); version != bcVersion {
+		panic(fmt.Sprintf("version mismatch (have %d, want %d)", version, bcVersion))
+	}
+	count := readUint32(r)
+	atoms := make([]string, count)
+	for i := 0; i < count; i++ {
+		atoms[i] = readString(r)
+	}
+	return atoms
+}
+
+func readAtom(r io.Reader, atoms []string) string {
+	idx := readUint32(r)
+	isTaggedInt := (idx & 1) == 1
+	idx = idx >> 1
+	if isTaggedInt {
+		return fmt.Sprintf("%d", idx)
+	}
+	if idx > 0 && idx <= len(atoms) {
+		return atoms[idx-1]
+	}
+	panic("atom out of range")
 }
 
 func readValue(r io.Reader, atoms []string) any {
@@ -156,17 +157,7 @@ func readValue(r io.Reader, atoms []string) any {
 		n := readUint32(r)
 		m := make(map[string]any, n)
 		for i := 0; i < n; i++ {
-			k := readUint32(r)
-			isTaggedInt := (k & 1) == 1
-			k = k >> 1
-			var atom string
-			if isTaggedInt {
-				atom = fmt.Sprintf("%d", k)
-			} else if k > 0 && k <= len(atoms) {
-				atom = atoms[k-1]
-			} else {
-				panic("atom out of range")
-			}
+			atom := readAtom(r, atoms)
 			m[atom] = readValue(r, atoms)
 		}
 		return m
