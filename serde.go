@@ -21,6 +21,7 @@ import (
 	"math"
 	"reflect"
 	"unicode/utf16"
+	"unsafe"
 )
 
 const bcVersion = 12
@@ -70,7 +71,6 @@ func ReadValue(r io.Reader) (v any, err error) {
 }
 
 func ReadObject(r io.Reader, v any) (err error) {
-	typ := reflect.TypeOf(v).Elem()
 	defer func() {
 		if x := recover(); x != nil {
 			switch v := x.(type) {
@@ -87,14 +87,9 @@ func ReadObject(r io.Reader, v any) (err error) {
 	}
 	count := readUint32(r) // property count
 	for i := 0; i < count; i++ {
-		atom := readAtom(r, atoms)
-		field, ok := typ.FieldByName(atom)
-		if ok {
-			_ = field
-			_ = readValue(r, atoms) // TODO
-		} else {
-			_ = readValue(r, atoms) // just skip the value
-		}
+		name := readAtom(r, atoms)
+		value := readValue(r, atoms)
+		setField(v, name, value)
 	}
 	return nil
 }
@@ -291,6 +286,23 @@ func readString(r io.Reader) string {
 		b := readBytes(r, n)
 		return string(b)
 	}
+}
+
+func setField(ptr any, name string, value any) bool {
+	pv := reflect.ValueOf(ptr).Elem()
+	field, ok := pv.Type().FieldByName(name)
+	if ok {
+		fv := pv.FieldByIndex(field.Index)
+		fp := unsafe.Pointer(fv.UnsafeAddr())
+		fv = reflect.NewAt(fv.Type(), fp).Elem()
+		vv := reflect.ValueOf(value)
+		if vv.IsValid() {
+			fv.Set(vv)
+		} else {
+			fv.SetZero()
+		}
+	}
+	return ok
 }
 
 func panicIf(err error) {

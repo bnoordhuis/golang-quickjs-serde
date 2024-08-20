@@ -47,6 +47,10 @@ func TestReadObject(t *testing.T) {
 	type empty struct{}
 	expect(&empty{}, tryReadObject(&empty{}, []byte{bcVersion, 0, 8, 0}))
 	expect(&empty{}, tryReadObject(&empty{}, []byte{bcVersion, 1, 2, 107, 8, 1, 2, 1}))
+	// null is coerced to 0
+	expect(&struct{ k int }{0}, tryReadObject(&struct{ k int }{42}, []byte{bcVersion, 1, 2, 107, 8, 1, 2, 1}))
+	k := 42
+	expect(&struct{ k *int }{}, tryReadObject(&struct{ k *int }{&k}, []byte{bcVersion, 1, 2, 107, 8, 1, 2, 1}))
 }
 
 func tryReadValue(b []byte) any {
