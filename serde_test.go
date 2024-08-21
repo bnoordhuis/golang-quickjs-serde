@@ -58,6 +58,10 @@ func TestWriteValue(t *testing.T) {
 	expect([]byte{bcVersion, 0, tagUndefined}, tryWriteValue(Undefined))
 	expect([]byte{bcVersion, 0, tagTrue}, tryWriteValue(true))
 	expect([]byte{bcVersion, 0, tagFalse}, tryWriteValue(false))
+	expect([]byte{bcVersion, 0, 15, 0}, tryWriteValue(ArrayBuffer{}))
+	expect([]byte{bcVersion, 0, 15, 1, 42}, tryWriteValue(ArrayBuffer{[]byte{42}}))
+	expect([]byte{bcVersion, 0, 14, 0, 0, 0, 15, 0}, tryWriteValue(Uint8ClampedArray{}))
+	expect([]byte{bcVersion, 0, 14, 2, 1, 0, 15, 1, 42}, tryWriteValue([]byte{42}))
 }
 
 func tryReadValue(b []byte) any {

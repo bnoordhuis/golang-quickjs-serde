@@ -50,6 +50,22 @@ const (
 	tagObjectReference
 )
 
+const (
+	uint8ClampedArray = iota
+	int8Array
+	uint8Array
+	int16Array
+	uint16Array
+	int32Array
+	uint32Array
+	bigInt64Array
+	bigUint64Array
+	float32Array
+	float64Array
+)
+
+type ArrayBuffer struct{ Bytes []byte }
+type Uint8ClampedArray struct{ Bytes []byte }
 type UndefinedValue struct{}
 
 var Undefined = UndefinedValue{}
@@ -108,27 +124,59 @@ func WriteValue(w io.Writer, v any) (err error) {
 			}
 		}
 	}()
+	atoms := []string{} // TODO
+	write(w, []byte{bcVersion})
+	writeUvarint(w, len(atoms))
 	switch t := v.(type) {
 	case nil:
-		writeHeader(w, nil, []byte{tagNull})
+		write(w, []byte{tagNull})
 	case UndefinedValue:
-		writeHeader(w, nil, []byte{tagUndefined})
+		write(w, []byte{tagUndefined})
 	case bool:
 		b := byte(tagFalse)
 		if t {
 			b = tagTrue
 		}
-		writeHeader(w, nil, []byte{b})
+		write(w, []byte{b})
+	case ArrayBuffer:
+		write(w, []byte{tagArrayBuffer})
+		writeUvarint(w, len(t.Bytes))
+		write(w, t.Bytes)
+	case Uint8ClampedArray:
+		writeTypedArray(w, len(t.Bytes), t.Bytes, uint8ClampedArray)
+	case []byte:
+		writeTypedArray(w, len(t), t, uint8Array)
+	case []int8:
+		writeTypedArray(w, len(t), t, int8Array)
+	case []int16:
+		writeTypedArray(w, len(t), t, int16Array)
+	case []uint16:
+		writeTypedArray(w, len(t), t, uint16Array)
+	case []int32:
+		writeTypedArray(w, len(t), t, int32Array)
+	case []uint32:
+		writeTypedArray(w, len(t), t, uint32Array)
+	case []int64:
+		writeTypedArray(w, len(t), t, bigInt64Array)
+	case []uint64:
+		writeTypedArray(w, len(t), t, bigUint64Array)
+	case []float32:
+		writeTypedArray(w, len(t), t, float32Array)
+	case []float64:
+		writeTypedArray(w, len(t), t, float64Array)
 	default:
 		panic(fmt.Sprintf("unsupported type %t", t))
 	}
 	return nil
 }
 
-func writeHeader(w io.Writer, atoms []string, extra []byte) {
-	write(w, []byte{bcVersion})
-	writeUvarint(w, len(atoms))
-	write(w, extra)
+func writeTypedArray(w io.Writer, n int, v any, tag byte) {
+	write(w, []byte{tagTypedArray, tag})
+	writeUvarint(w, n)
+	writeUvarint(w, 0)
+	write(w, []byte{tagArrayBuffer})
+	writeUvarint(w, n)
+	panicIf(binary.Write(w, binary.LittleEndian, v))
 }
 
 func write(w io.Writer, b []byte) {
@@ -213,9 +261,6 @@ func readValue(r io.Reader, atoms []string) any {
 		return readBytes(r, n)
 	case tagTypedArray:
 		tag := readByte(r)
-		if tag > 10 {
-			panic(fmt.Sprintf("bad typed array tag: %d", tag))
-		}
 		n := readUint32(r)
 		// offset into arraybuffer (t time of serialization;
 		// *not* an offset into the arraybuffer following
@@ -228,52 +273,52 @@ func readValue(r io.Reader, atoms []string) any {
 			panic("typed array not followed by arraybuffer of right size")
 		}
 		switch tag {
-		case 0: // Uint8ClampedArray
+		case uint8ClampedArray:
 			v := make([]byte, n)
 			panicIf(binary.Read(r, binary.LittleEndian, &v))
 			return v
-		case 2: // Uint8Array
+		case uint8Array:
 			v := make([]byte, n)
 			panicIf(binary.Read(r, binary.LittleEndian, &v))
 			return v
-		case 1: // Int8Array
+		case int8Array:
 			v := make([]int8, n)
 			panicIf(binary.Read(r, binary.LittleEndian, &v))
 			return v
-		case 3: // Int16Array
+		case int16Array:
 			v := make([]int16, n)
 			panicIf(binary.Read(r, binary.LittleEndian, &v))
 			return v
-		case 4: // Uint16Array
+		case uint16Array:
 			v := make([]uint16, n)
 			panicIf(binary.Read(r, binary.LittleEndian, &v))
 			return v
-		case 5: // Int32Array
+		case int32Array:
 			v := make([]int32, n)
 			panicIf(binary.Read(r, binary.LittleEndian, &v))
 			return v
-		case 6: // Uint32Array
+		case uint32Array:
 			v := make([]uint32, n)
 			panicIf(binary.Read(r, binary.LittleEndian, &v))
 			return v
-		case 7: // BigInt64Array
+		case bigInt64Array:
 			v := make([]int64, n)
 			panicIf(binary.Read(r, binary.LittleEndian, &v))
 			return v
-		case 8: // BigUint64Array
+		case bigUint64Array:
 			v := make([]uint64, n)
 			panicIf(binary.Read(r, binary.LittleEndian, &v))
 			return v
-		case 9: // Float32Array
+		case float32Array:
 			v := make([]float32, n)
 			panicIf(binary.Read(r, binary.LittleEndian, &v))
 			return v
-		case 10: // Float64Array
+		case float64Array:
 			v := make([]float64, n)
 			panicIf(binary.Read(r, binary.LittleEndian, &v))
 			return v
 		default:
-			panic("unreachable")
+			panic(fmt.Sprintf("bad typed array tag: %d", tag))
 		}
 	default:
 		panic(fmt.Sprintf("unsupported %s", tagName(tag)))
