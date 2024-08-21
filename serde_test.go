@@ -53,6 +53,13 @@ func TestReadObject(t *testing.T) {
 	expect(&struct{ k *int }{}, tryReadObject(&struct{ k *int }{&k}, []byte{bcVersion, 1, 2, 107, 8, 1, 2, 1}))
 }
 
+func TestWriteValue(t *testing.T) {
+	expect([]byte{bcVersion, 0, tagNull}, tryWriteValue(nil))
+	expect([]byte{bcVersion, 0, tagUndefined}, tryWriteValue(Undefined))
+	expect([]byte{bcVersion, 0, tagTrue}, tryWriteValue(true))
+	expect([]byte{bcVersion, 0, tagFalse}, tryWriteValue(false))
+}
+
 func tryReadValue(b []byte) any {
 	v, err := ReadValue(bytes.NewReader(b))
 	if err != nil {
@@ -67,6 +74,14 @@ func tryReadObject(v any, b []byte) any {
 		panic(err)
 	}
 	return v
+}
+
+func tryWriteValue(v any) []byte {
+	buf := bytes.Buffer{}
+	if err := WriteValue(&buf, v); err != nil {
+		panic(err)
+	}
+	return buf.Bytes()
 }
 
 func expect(expected any, actual any) {

@@ -94,8 +94,53 @@ func ReadObject(r io.Reader, v any) (err error) {
 	return nil
 }
 
-func WriteValue(w io.Writer, v any) error {
+// The wire format is somewhat inefficient in that object keys ("atoms")
+// go at the front, so you have to buffer the output until you're sure
+// you've seen all objects.
+func WriteValue(w io.Writer, v any) (err error) {
+	defer func() {
+		if x := recover(); x != nil {
+			switch v := x.(type) {
+			case error:
+				err = v
+			default:
+				err = fmt.Errorf("serde.ReadObject: %v", v)
+			}
+		}
+	}()
+	switch t := v.(type) {
+	case nil:
+		writeHeader(w, nil, []byte{tagNull})
+	case UndefinedValue:
+		writeHeader(w, nil, []byte{tagUndefined})
+	case bool:
+		b := byte(tagFalse)
+		if t {
+			b = tagTrue
+		}
+		writeHeader(w, nil, []byte{b})
+	default:
+		panic(fmt.Sprintf("unsupported type %t", t))
+	}
 	return nil
+}
+
+func writeHeader(w io.Writer, atoms []string, extra []byte) {
+	write(w, []byte{bcVersion})
+	writeUvarint(w, len(atoms))
+	write(w, extra)
+}
+
+func write(w io.Writer, b []byte) {
+	if _, err := w.Write(b); err != nil {
+		panic(err)
+	}
+}
+
+func writeUvarint(w io.Writer, v int) {
+	var b [8]byte
+	n := binary.PutUvarint(b[:], uint64(v))
+	write(w, b[:n])
 }
 
 func readHeader(r io.Reader) []string {
